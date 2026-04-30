@@ -12,74 +12,88 @@ export default async function handler(req) {
     return new Response(null, { status: 200, headers: cors });
   }
 
+  const CODE = '030350';
+
   try {
-    const res = await fetch('https://www.ranix.co.kr/kr/ir/stock_info.php', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'ko-KR,ko;q=0.9',
-        'Referer': 'https://www.ranix.co.kr/',
-      }
-    });
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'ko-KR,ko;q=0.9',
+      'Referer': 'https://finance.naver.com/',
+    };
 
-    const html = await res.text();
+    const [mainRes, hogaRes, timeRes, dailyRes] = await Promise.allSettled([
+      fetch(`https://finance.naver.com/item/main.naver?code=${CODE}`, { headers }),
+      fetch(`https://finance.naver.com/item/hoga.naver?code=${CODE}`, { headers }),
+      fetch(`https://finance.naver.com/item/sise_time.naver?code=${CODE}&page=1`, { headers }),
+      fetch(`https://finance.naver.com/item/sise_day.naver?code=${CODE}&page=1`, { headers }),
+    ]);
 
-    // 현재가
-    const curPrice = html.match(/class="stock-cur-price[^"]*"[^>]*>\s*([\d,]+)/)?.[1]?.trim() || null;
-    const direction = html.match(/class="stock-cur-price (up|down|normal)/)?.[1] || 'normal';
-    const change = html.match(/전일대비[\s\S]*?<b class="pr-(?:up|down)">([-+]?[\d,]+)<\/b>/)?.[1] || null;
-    const prevClose = html.match(/<dt>전일종가<\/dt>\s*<dd><b>([\d,]+)<\/b>/)?.[1] || null;
-    const open = html.match(/<dt>시가<\/dt>\s*<dd><b[^>]*>([\d,]+)<\/b>/)?.[1] || null;
-    const high = html.match(/<dt>고가<\/dt>\s*<dd><b[^>]*>([\d,]+)<\/b>/)?.[1] || null;
-    const low = html.match(/<dt>저가<\/dt>\s*<dd><b[^>]*>([\d,]+)<\/b>/)?.[1] || null;
-    const upperLimit = html.match(/<dt>상한가<\/dt>\s*<dd><b[^>]*>([\d,]+)<\/b>/)?.[1] || null;
-    const lowerLimit = html.match(/<dt>하한가<\/dt>\s*<dd><b[^>]*>([\d,]+)<\/b>/)?.[1] || null;
-    const per = html.match(/<dt>PER<\/dt>\s*<dd><b[^>]*>([\d.]+)<\/b>/)?.[1] || null;
-    const volume = html.match(/<dt>거래량<\/dt>\s*<dd><b>([\d,]+)<\/b>/)?.[1] || null;
-    const tradeAmt = html.match(/<dt>거래대금<\/dt>\s*<dd><b>([\d,]+)<\/b>/)?.[1] || null;
-    const high52 = html.match(/<dt>52주 최고<\/dt>\s*<dd><b[^>]*>([\d,]+)<\/b>/)?.[1] || null;
-    const low52 = html.match(/<dt>52주 최저<\/dt>\s*<dd><b[^>]*>([\d,]+)<\/b>/)?.[1] || null;
-    const shares = html.match(/<dt>상장주식수<\/dt>\s*<dd><b>([\d,]+)<\/b>/)?.[1] || null;
-    const faceVal = html.match(/<dt>액면가<\/dt>\s*<dd><b>([\d,]+)<\/b>/)?.[1] || null;
+    const mainHtml  = mainRes.status  === 'fulfilled' ? await mainRes.value.text()  : '';
+    const hogaHtml  = hogaRes.status  === 'fulfilled' ? await hogaRes.value.text()  : '';
+    const timeHtml  = timeRes.status  === 'fulfilled' ? await timeRes.value.text()  : '';
+    const dailyHtml = dailyRes.status === 'fulfilled' ? await dailyRes.value.text() : '';
 
-    // 호가
+    /* ── 현재가 ── */
+    const curPrice  = mainHtml.match(/id="_nowVal"[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const prevClose = mainHtml.match(/id="_prevPrice"[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const changeRaw = mainHtml.match(/id="_diff"[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const dirRaw    = mainHtml.match(/id="_rate"[^>]*>[\s\S]*?class="([^"]*)"/)?.[1] || '';
+    const direction = dirRaw.includes('up') ? 'up' : dirRaw.includes('down') ? 'down' : 'normal';
+    const changeSign = direction === 'up' ? '▲' : direction === 'down' ? '▼' : '';
+    const change    = changeRaw ? changeSign + changeRaw : null;
+
+    const open     = mainHtml.match(/시가[^<]*<\/dt>[\s\S]*?<strong[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const high     = mainHtml.match(/고가[^<]*<\/dt>[\s\S]*?<strong[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const low      = mainHtml.match(/저가[^<]*<\/dt>[\s\S]*?<strong[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const volume   = mainHtml.match(/거래량[^<]*<\/dt>[\s\S]*?<strong[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const tradeAmt = mainHtml.match(/거래대금[^<]*<\/dt>[\s\S]*?<em[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const high52   = mainHtml.match(/52주.*?최고[^<]*<\/dt>[\s\S]*?<strong[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const low52    = mainHtml.match(/52주.*?최저[^<]*<\/dt>[\s\S]*?<strong[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const per      = mainHtml.match(/PER[^<]*<\/dt>[\s\S]*?<em[^>]*>([\d.N/A-]+)/)?.[1]?.trim() || null;
+    const shares   = mainHtml.match(/상장주식수[^<]*<\/dt>[\s\S]*?<em[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+    const faceVal  = mainHtml.match(/액면가[^<]*<\/dt>[\s\S]*?<em[^>]*>([\d,]+)/)?.[1]?.trim() || null;
+
+    /* 상한/하한 — 전일종가 기준 ±30% */
+    let upperLimit = null, lowerLimit = null;
+    if (prevClose) {
+      const base = parseInt(prevClose.replace(/,/g, ''));
+      upperLimit = (Math.floor(base * 1.3 / 5) * 5).toLocaleString('ko-KR');
+      lowerLimit = (Math.ceil(base  * 0.7 / 5) * 5).toLocaleString('ko-KR');
+    }
+
+    /* ── 호가 ── */
     const hogaRows = [];
-    const hogaSection = html.match(/class="tbl-tit">호가<\/h1>([\s\S]*?)<\/article>/)?.[1] || '';
-    const hogaTrs = hogaSection.matchAll(/<tr>([\s\S]*?)<\/tr>/g);
-    for (const tr of hogaTrs) {
+    for (const tr of hogaHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
       const tds = [...tr[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)]
-        .map(m => m[1].replace(/<[^>]+>/g, '').trim());
-      if (tds.length === 3) hogaRows.push(tds);
+        .map(m => m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim());
+      if (tds.length >= 3 && /[\d,]+/.test(tds[1])) {
+        hogaRows.push([tds[0] || '', tds[1], tds[2] || '']);
+        if (hogaRows.length >= 10) break;
+      }
     }
 
-    // 시간대별 체결가
+    /* ── 시간대별 체결가 ── */
     const cheolRows = [];
-    const cheolSection = html.match(/class="tbl-tit">시간대별 체결가<\/h1>([\s\S]*?)<\/article>/)?.[1] || '';
-    const cheolTrs = cheolSection.matchAll(/<tr>([\s\S]*?)<\/tr>/g);
-    for (const tr of cheolTrs) {
+    for (const tr of timeHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
       const tds = [...tr[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)]
-        .map(m => m[1].replace(/<[^>]+>/g, '').trim());
-      if (tds.length === 6 && /\d{2}:\d{2}/.test(tds[0])) cheolRows.push(tds);
+        .map(m => m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim());
+      if (tds.length >= 6 && /\d{2}:\d{2}/.test(tds[0])) {
+        cheolRows.push(tds.slice(0, 6));
+        if (cheolRows.length >= 10) break;
+      }
     }
 
-    // 회원별거래
-    const memberRows = [];
-    const memberSection = html.match(/class="tbl-tit">회원별거래<\/h1>([\s\S]*?)<\/article>/)?.[1] || '';
-    const memberTrs = memberSection.matchAll(/<tr>([\s\S]*?)<\/tr>/g);
-    for (const tr of memberTrs) {
-      const tds = [...tr[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)]
-        .map(m => m[1].replace(/<[^>]+>/g, '').trim());
-      if (tds.length === 4 && tds[0] && !/증권사/.test(tds[0])) memberRows.push(tds);
-    }
-
-    // 일자별 시세
+    /* ── 일자별 시세 ── */
     const dailyRows = [];
-    const dailySection = html.match(/class="tbl-tit">일자별 시세<\/h1>([\s\S]*?)<\/article>/)?.[1] || '';
-    const dailyTrs = dailySection.matchAll(/<tr>([\s\S]*?)<\/tr>/g);
-    for (const tr of dailyTrs) {
+    for (const tr of dailyHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)) {
       const tds = [...tr[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)]
-        .map(m => m[1].replace(/<[^>]+>/g, '').trim());
-      if (tds.length === 8 && /\d{2}\/\d{2}\/\d{2}/.test(tds[0])) dailyRows.push(tds);
+        .map(m => m[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim());
+      if (tds.length >= 7 && /\d{4}\.\d{2}\.\d{2}/.test(tds[0])) {
+        const d = tds[0].replace(/\d{2}(\d{2})\.(\d{2})\.(\d{2})/, '$1/$2/$3');
+        dailyRows.push([d, tds[1], tds[2], tds[3], tds[4], tds[5], tds[6], tds[7] || '']);
+        if (dailyRows.length >= 10) break;
+      }
     }
 
     const result = {
@@ -89,10 +103,10 @@ export default async function handler(req) {
         open, high, low, upperLimit, lowerLimit,
         per, volume, tradeAmt, high52, low52, shares, faceVal,
       },
-      hoga: hogaRows,
+      hoga:       hogaRows,
       cheolgyeol: cheolRows,
-      member: memberRows,
-      daily: dailyRows,
+      member:     [],   /* 네이버 금융 미제공 */
+      daily:      dailyRows,
     };
 
     return new Response(JSON.stringify(result), { status: 200, headers: cors });
