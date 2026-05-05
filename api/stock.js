@@ -1,19 +1,14 @@
-export const config = { runtime: 'edge' };
-
-export default async function handler(req) {
-  const cors = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': 's-maxage=60, stale-while-revalidate=30',
-  };
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: cors });
+    return res.status(200).end();
   }
 
-  const url  = new URL(req.url);
-  const type = url.searchParams.get('type');
+  const type = req.query.type;
 
   /* ── 공시 (DART API) ── */
   if (type === 'dart') {
@@ -21,11 +16,11 @@ export default async function handler(req) {
       const DART_KEY  = '7fcb19ef4ddfcc20357facfd6599d61aeca9ff9b';
       const CORP_CODE = '01327092';
 
-      const res  = await fetch(
+      const dartRes  = await fetch(
         `https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_KEY}&corp_code=${CORP_CODE}&bgn_de=20240101&page_no=1&page_count=6`,
         { headers: { 'Accept': 'application/json' } }
       );
-      const data = await res.json();
+      const data = await dartRes.json();
 
       const items = (data.list || []).map(function(item) {
         return {
@@ -35,16 +30,16 @@ export default async function handler(req) {
         };
       });
 
-      return new Response(JSON.stringify({ items, status: data.status, message: data.message }), { status: 200, headers: cors });
+      return res.status(200).json({ items, status: data.status, message: data.message });
 
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message, stack: err.stack }), { status: 500, headers: cors });
+      return res.status(500).json({ error: err.message });
     }
   }
 
   /* ── 주가 ── */
   try {
-    const res = await fetch('https://www.ranix.co.kr/kr/ir/stock_info.php', {
+    const stockRes = await fetch('https://www.ranix.co.kr/kr/ir/stock_info.php', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml',
@@ -53,7 +48,7 @@ export default async function handler(req) {
       }
     });
 
-    const html = await res.text();
+    const html = await stockRes.text();
 
     const curPrice   = html.match(/class="stock-cur-price[^"]*"[^>]*>\s*([\d,]+)/)?.[1]?.trim() || null;
     const direction  = html.match(/class="stock-cur-price (up|down|normal)/)?.[1] || 'normal';
@@ -121,9 +116,9 @@ export default async function handler(req) {
       daily: dailyRows,
     };
 
-    return new Response(JSON.stringify(result), { status: 200, headers: cors });
+    return res.status(200).json(result);
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: cors });
+    return res.status(500).json({ error: err.message });
   }
 }
