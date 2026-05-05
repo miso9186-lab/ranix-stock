@@ -19,7 +19,7 @@ export default async function handler(req) {
   if (type === 'dart') {
     try {
       const DART_KEY  = '7fcb19ef4ddfcc20357facfd6599d61aeca9ff9b';
-      const CORP_CODE = '00937362'; /* 라닉스 고유번호 */
+      const CORP_CODE = '01327092'; /* 라닉스 고유번호 */
 
       const res  = await fetch(
         `https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_KEY}&corp_code=${CORP_CODE}&page_no=1&page_count=6`,
