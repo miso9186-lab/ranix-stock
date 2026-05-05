@@ -7,6 +7,7 @@ export default async function handler(req) {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 's-maxage=60, stale-while-revalidate=30',
   };
+  
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: cors });
