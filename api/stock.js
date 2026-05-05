@@ -22,7 +22,7 @@ export default async function handler(req) {
       const CORP_CODE = '01327092'; /* 라닉스 고유번호 */
 
       const res  = await fetch(
-        `https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_KEY}&corp_code=${CORP_CODE}&page_no=1&page_count=6`,
+        `https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_KEY}&corp_code=${CORP_CODE}&bgn_de=20240101&page_no=1&page_count=6`,
         { headers: { 'Accept': 'application/json' } }
       );
       const data = await res.json();
