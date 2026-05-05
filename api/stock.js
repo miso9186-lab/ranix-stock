@@ -12,14 +12,14 @@ export default async function handler(req) {
     return new Response(null, { status: 200, headers: cors });
   }
 
-  /* ── 공시 (DART API) ── */
   const url  = new URL(req.url);
   const type = url.searchParams.get('type');
 
+  /* ── 공시 (DART API) ── */
   if (type === 'dart') {
     try {
       const DART_KEY  = '7fcb19ef4ddfcc20357facfd6599d61aeca9ff9b';
-      const CORP_CODE = '01327092'; /* 라닉스 고유번호 */
+      const CORP_CODE = '01327092';
 
       const res  = await fetch(
         `https://opendart.fss.or.kr/api/list.json?crtfc_key=${DART_KEY}&corp_code=${CORP_CODE}&bgn_de=20240101&page_no=1&page_count=6`,
@@ -35,10 +35,10 @@ export default async function handler(req) {
         };
       });
 
-      return new Response(JSON.stringify({ items }), { status: 200, headers: cors });
+      return new Response(JSON.stringify({ items, status: data.status, message: data.message }), { status: 200, headers: cors });
 
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: cors });
+      return new Response(JSON.stringify({ error: err.message, stack: err.stack }), { status: 500, headers: cors });
     }
   }
 
